@@ -1,4 +1,5 @@
 class Object:
+    # 相当于是工件类和设备类的共同父类，后边new对象的时候直接用的这个类
     def __init__(self, I):
         self.I = I
         self.Start = []

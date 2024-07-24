@@ -86,9 +86,10 @@ class Situation:
             Tard_a = 9999
         return U_ave, U_std, CRO_ave, CRJ_ave, CRJ_std, Tard_e, Tard_a
 
-    # Composite dispatching rule 1
+    # Composite dispatching rule
     # return Job,Machine
     def rule1(self):
+        # 优先选择那些不能按期完成的工件，然后选择任务时间最长的机器
         # T_cur:平均完工时间
         T_cur = sum(self.CTK) / self.M_num
         # Tard_Job:不能按期完成的工件
@@ -124,9 +125,8 @@ class Situation:
         # print('This is from rule 1:',Machine)
         return Job_i, Machine
 
-    # Composite dispatching rule 2
-    # return Job,Machine
     def rule2(self):
+        # 优先选择那些不能按期完成的工件，然后根据工序剩余时间和平均完工时间选择
         # T_cur:平均完工时间
         T_cur = sum(self.CTK) / self.M_num
         # Tard_Job:不能按期完成的工件
@@ -162,8 +162,8 @@ class Situation:
         # print('This is from rule 2:',Machine)
         return Job_i, Machine
 
-    # Composite dispatching rule 3
     def rule3(self):
+        # 随机选择一个未完成的工件，然后根据机器的利用率或总任务时间选择机器
         # T_cur:平均完工时间
         T_cur = sum(self.CTK) / self.M_num
         # Tard_Job:不能按期完成的工件
@@ -196,8 +196,8 @@ class Situation:
         # print('This is from rule 3:',Machine)
         return Job_i, Machine
 
-    # Composite dispatching rule 4
     def rule4(self):
+        # 随机选择一个未完成的工件，然后选择最早可用的机器
         UC_Job = [j for j in range(self.J_num) if self.OP[j] < self.J[j]]
         Job_i = random.choice(UC_Job)
         try:
@@ -218,9 +218,8 @@ class Situation:
         # print('This is from rule 4:',Machine)
         return Job_i, Machine
 
-    # Composite dispatching rule 5
     def rule5(self):
-
+        # 优先选择那些不能按期完成的工件，然后根据任务完成率和平均完工时间选择
         # T_cur:平均完工时间
         T_cur = sum(self.CTK) / self.M_num
         # Tard_Job:不能按期完成的工件
@@ -255,9 +254,8 @@ class Situation:
         # print('This is from rule 5:',Machine)
         return Job_i, Machine
 
-    # Composite dispatching rule 6
-    # return Job,Machine
     def rule6(self):
+        # 根据剩余处理时间和平均完工时间选择任务和机器
         # T_cur:平均完工时间
         T_cur = sum(self.CTK) / self.M_num
         UC_Job = [j for j in range(self.J_num) if self.OP[j] < self.J[j]]
@@ -288,62 +286,60 @@ class Situation:
         return Job_i, Machine
 
     def scheduling(self, action):
-        Job, Machine = action[0], action[1]
-        O_n = len(self.Jobs[Job].End)
+        # 将一个工件 (Job) 进行调度到指定的机器 (Machine) 上，计算作业的开始和结束时间，并更新机器和作业的状态
+        Job, Machine = action[0], action[1]  # 从 action 中提取作业和机器的索引
+        O_n = len(self.Jobs[Job].End)  # 获取该作业的当前工序数
         # print(Job, Machine,O_n)
-        Idle = self.Machines[Machine].idle_time()
-        try:
+        Idle = self.Machines[Machine].idle_time()   # 获取机器的空闲时间段
+        try:    # 计算上道工序的完成时间（如果存在）
             last_ot = max(self.Jobs[Job].End)  # 上道工序加工时间
         except:
             last_ot = 0
-        try:
+        try:    # 计算机器的最后完工时间（如果存在）
             last_mt = max(self.Machines[Machine].End)  # 机器最后完工时间
         except:
             last_mt = 0
-        Start_time = max(last_ot, last_mt)
-        PT = self.Processing_time[Job][O_n][Machine]  # 工序加工时间
+        Start_time = max(last_ot, last_mt)  # 计算作业的开始时间（取上道工序和机器的最后完工时间中的较大值）
+        PT = self.Processing_time[Job][O_n][Machine]  # # 获取当前工序在指定机器上的加工时间
+        # 计算合适的开始时间
         for i in range(len(Idle)):
-            if Idle[i][1] - Idle[i][0] > PT:
-                if Idle[i][0] > last_ot:
-                    start_time = Idle[i][0]
-                    pass
-                if Idle[i][0] < last_ot and Idle[i][1] - last_ot > PT:
-                    start_time = last_ot
-                    pass
-        end_time = Start_time + PT
+            if Idle[i][1] - Idle[i][0] > PT:    # 如果机器空闲时间段足够长以容纳当前作业
+                if Idle[i][0] > last_ot:    # 如果机器的空闲开始时间晚于上道工序结束时间
+                    Start_time = Idle[i][0]
+                if Idle[i][0] < last_ot and Idle[i][1] - last_ot > PT:  # 如果机器的空闲时间段可以从上道工序结束时间开始
+                    Start_time = last_ot
+        end_time = Start_time + PT  # 计算结束时间
+        # 更新机器和作业的状态
         self.Machines[Machine]._add(Start_time, end_time, Job, PT)
         self.Jobs[Job]._add(Start_time, end_time, Machine, PT)
         self._Update(Job, Machine)
 
     def reward(self, Ta_t, Te_t, Ta_t1, Te_t1, U_t, U_t1):
         '''
-               :param Ta_t: Tard_a(t)
-               :param Te_t: Tard_e(t)
-               :param Ta_t1: Tard_a(t+1)
-               :param Te_t1: Tard_e(t+1)
-               :param U_t: U_ave(t)
-               :param U_t1: U_ave(t+1)
+               :param Ta_t: Tard_a(t) 当前时刻的实际迟滞率
+               :param Te_t: Tard_e(t) 前时刻的预计迟滞率
+               :param Ta_t1: Tard_a(t+1) 下一时刻的实际迟滞率
+               :param Te_t1: Tard_e(t+1) 下一时刻的预计迟滞率
+               :param U_t: U_ave(t) 当前时刻的平均机器利用率
+               :param U_t1: U_ave(t+1) 下一时刻的平均机器利用率
                :return: reward
         '''
-        if Ta_t1 < Ta_t:
+        if Ta_t1 < Ta_t:    # 实际迟滞率下降:
             rt = 1
-        else:
-            if Ta_t1 > Ta_t:
-                rt = -1
-            else:
-                if Te_t1 < Te_t:
+        elif Ta_t1 > Ta_t:    # 实际迟滞率上升
+            rt = -1
+        else:   # 如果实际迟滞率没有变化，则比较预计迟滞率
+            if Te_t1 < Te_t:    # 下一时刻的预计迟滞率低于当前时刻的预计迟滞率
+                rt = 1
+            elif Te_t1 > Te_t:  # 下一时刻的预计迟滞率高于当前时刻的预计迟滞率
+                rt = 1
+            else:   # 如果迟滞率没有显著变化，则比较机器的利用率
+                if U_t1 > U_t:  # 下一时刻的机器利用率高于当前时刻
                     rt = 1
-                else:
-                    if Te_t1 > Te_t:
-                        rt = 1
-                    else:
-                        if U_t1 > U_t:
-                            rt = 1
-                        else:
-                            if U_t1 > 0.95 * U_t:
-                                rt = 0
-                            else:
-                                rt = -1
+                elif U_t1 > 0.95 * U_t:   # 机器利用率仅稍微下降（保持在95%以内）
+                        rt = 0
+                else:   # 机器利用率下降超过5%
+                    rt = -1
         return rt
 
 
